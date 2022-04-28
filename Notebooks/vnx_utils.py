@@ -455,7 +455,7 @@ class NetworkLayer(DefaultIP):
         elif not isinstance(ip, str):
             raise ValueError("IP address must be a string.")
 
-        mac_int = int(mac.replace(":", ""))
+        mac_int = int("0x{}".format(mac.replace(":", "")), 16)
         little_mac_int = _byteOrderingEndianess(mac_int, 6)
         mac_msb = little_mac_int // (2 ** 32)
         mac_lsb = little_mac_int % (2 ** 32)
@@ -550,7 +550,7 @@ class NetworkLayer(DefaultIP):
 
         ipaddr = int(ipaddress.IPv4Address(ipaddrsrt))
         self.register_map.ip_address = ipaddr
-        if gwaddr is "None":
+        if gwaddr == "None":
             self.register_map.gateway = (ipaddr & 0xFFFFFF00) + 1
         else:
             self.register_map.gateway = int(ipaddress.IPv4Address(gwaddr))
@@ -734,7 +734,7 @@ class TrafficGenerator(DefaultIP):
                 on direction argument"
             )
 
-        if direction is "rx":
+        if direction == "rx":
             tot_bytes = int(self.register_map.in_traffic_bytes)
             tot_cycles = int(self.register_map.in_traffic_cycles)
             tot_pkts = int(self.register_map.in_traffic_packets)
