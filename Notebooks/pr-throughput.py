@@ -107,10 +107,10 @@ def check_workers(client, workers):
     return worker_check
 
 
-def perform_pr_once():
+def perform_pr_once(bitstream=BITSTREAM_1):
     process = subprocess.run(
-        " ".join([PR_SCRIPT_PATH, BITSTREAM_1,
-                  BOARD_NAME, get_ltx_path(BITSTREAM_1)]),
+        " ".join([PR_SCRIPT_PATH, bitstream,
+                  BOARD_NAME, get_ltx_path(bitstream)]),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return process.stdout, process.stderr
 
@@ -123,7 +123,10 @@ def perform_pr_continuous(inter_pr_time):
         node_name = platform.node()
 
         # Do PR
-        ret = perform_pr_once()
+        bitstream = BITSTREAM_1
+        if(itr % 2 == 0):
+            bitstream = BITSTREAM_2
+        ret = perform_pr_once(bitstream)
         ret_list.append(ret)
 
         with open('/home/ubuntu/test.log', 'a') as f:
@@ -219,7 +222,7 @@ def measure_throughput_under_pr(client, dut, inter_pr_time,
     return ret
 
 
-def measure_throughput(ol_w0, payload_size, num_pkts=1e9):
+def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
     # Setup local device and throughput experiment before calling this function
     ol_w0_1_tg = ol_w0.traffic_generator_1_1
     ol_w0_0_tg = ol_w0.traffic_generator_0_3
@@ -231,8 +234,16 @@ def measure_throughput(ol_w0, payload_size, num_pkts=1e9):
     beats = int(payload_size / 64)
     ol_w0_0_tg.register_map.number_beats = beats
     ol_w0_0_tg.register_map.CTRL.AP_START = 1
+    start_time = time.time()
     while(int(ol_w0_0_tg.register_map.out_traffic_packets) != num_pkts):
-        time.sleep(0.8)
+        start_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
+        time.sleep(1)
+        end_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
+        end_time = time.time()
+        print(("Sent {} pkts in 1 sec ({} Mpps)."
+               " Total elapsed {} secs. Total sent {} pkts.")
+              .format(end_pkts - start_pkts, (end_pkts - start_pkts)/1e6,
+                      end_time - start_time, end_pkts))
 
     # Get results from local and remote worker
     rx_tot_pkt, rx_thr, rx_time = ol_w0_1_tg.computeThroughputApp('rx')
@@ -269,12 +280,12 @@ def measure_throughput(ol_w0, payload_size, num_pkts=1e9):
     return entry_dict
 
 
-# # %%
-# # if(__name__ == "__main__"):
-# workers = get_workers(client)
-# worker_check = check_workers(client, workers)
-# assert len(worker_check) == 1 and worker_check[0][0] == REMOTE_NAME
-# dut = workers[0]
+# %%
+# if(__name__ == "__main__"):
+workers = get_workers(client)
+worker_check = check_workers(client, workers)
+assert len(worker_check) == 1 and worker_check[0][0] == REMOTE_NAME
+dut = workers[0]
 
 # # %%
 # wf = client.submit(perform_pr_once, workers=dut, pure=False)
@@ -282,15 +293,26 @@ def measure_throughput(ol_w0, payload_size, num_pkts=1e9):
 # stdout, stderr = wf.result()
 # print(stdout)
 # end = time.time()
-# print(end - start)
+# print("PR operation took {} seconds.".format(end - start))
 
 # %%
 ol_w0 = setup_local_machine()
 setup_local_machine_throughput_experiment(ol_w0)
-ret = measure_throughput(ol_w0, 128)
-print(ret)
 
+start = time.time()
+ret = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
+end = time.time()
+print("No PR: {}".format(ret))
+print("Thr measurement took {} seconds.".format(end - start))
+
+start = time.time()
+ret = measure_throughput_under_pr(
+    client, dut, 0, ol_w0, 128, int(2 * 60 * 58 * 1e6))
+end = time.time()
+print("With full PR blast: {}".format(ret))
+print("Thr measurement took {} seconds.".format(end - start))
 
 # %%
-pynq.Overlay.free(ol_w0)
+client.close()
 cluster.close()
+pynq.Overlay.free(ol_w0)
