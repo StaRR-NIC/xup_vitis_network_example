@@ -237,12 +237,19 @@ def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
     start_time = time.time()
     while(int(ol_w0_0_tg.register_map.out_traffic_packets) != num_pkts):
         start_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
+        start_rx_pkts = int(ol_w0_1_tg.register_map.in_traffic_packets)
         time.sleep(1)
         end_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
+        end_rx_pkts = int(ol_w0_1_tg.register_map.in_traffic_packets)
         end_time = time.time()
         print(("Sent {} pkts in 1 sec ({} Mpps)."
                " Total elapsed {} secs. Total sent {} pkts.")
               .format(end_pkts - start_pkts, (end_pkts - start_pkts)/1e6,
+                      end_time - start_time, end_pkts))
+        print(("Recd {} pkts in 1 sec ({} Mpps)."
+               " Total elapsed {} secs. Total sent {} pkts.")
+              .format(end_rx_pkts - start_rx_pkts,
+                      (end_rx_pkts - start_rx_pkts)/1e6,
                       end_time - start_time, end_pkts))
 
     # Get results from local and remote worker
@@ -299,11 +306,12 @@ dut = workers[0]
 ol_w0 = setup_local_machine()
 setup_local_machine_throughput_experiment(ol_w0)
 
-start = time.time()
-ret = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
-end = time.time()
-print("No PR: {}".format(ret))
-print("Thr measurement took {} seconds.".format(end - start))
+# Sent  6,960,000,000 size:  128-Byte done!       Got  6,960,000,000 took 118.3673 sec, thr: 60.211 Gbps, theoretical: 65.979 Gbps, difference:  5.768 Gbps
+# start = time.time()
+# ret = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
+# end = time.time()
+# print("No PR: {}".format(ret))
+# print("Thr measurement took {} seconds.".format(end - start))
 
 start = time.time()
 ret = measure_throughput_under_pr(
