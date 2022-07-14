@@ -1,9 +1,11 @@
 # %%
+import json
 import os
 import platform
 import subprocess
 import time
 
+import pandas as pd
 import pynq
 from distributed.client import Client
 from distributed.deploy.ssh import SSHCluster
@@ -235,6 +237,8 @@ def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
     ol_w0_0_tg.register_map.number_beats = beats
     ol_w0_0_tg.register_map.CTRL.AP_START = 1
     start_time = time.time()
+    entries = []
+    print("Time, sent pkts, recd pkts, mpps sent, mpps recd")
     while(int(ol_w0_0_tg.register_map.out_traffic_packets) != num_pkts):
         start_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
         start_rx_pkts = int(ol_w0_1_tg.register_map.in_traffic_packets)
@@ -242,15 +246,29 @@ def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
         end_pkts = int(ol_w0_0_tg.register_map.out_traffic_packets)
         end_rx_pkts = int(ol_w0_1_tg.register_map.in_traffic_packets)
         end_time = time.time()
-        print(("Sent {} pkts in 1 sec ({} Mpps)."
-               " Total elapsed {} secs. Total sent {} pkts.")
-              .format(end_pkts - start_pkts, (end_pkts - start_pkts)/1e6,
-                      end_time - start_time, end_pkts))
-        print(("Recd {} pkts in 1 sec ({} Mpps)."
-               " Total elapsed {} secs. Total sent {} pkts.")
-              .format(end_rx_pkts - start_rx_pkts,
-                      (end_rx_pkts - start_rx_pkts)/1e6,
-                      end_time - start_time, end_pkts))
+
+        entry = {
+            'time': end_time,
+            'tx_pkts': end_pkts,
+            'rx_pkts': end_rx_pkts,
+        }
+        entries.append(entry)
+
+        print("{:.6f} secs, TX {} pkts, RX {} pkts, TX {} Mpps, RX {} Mpps".format(
+            end_time - start_time,
+            end_pkts - start_pkts, end_rx_pkts - start_rx_pkts,
+            (end_pkts - start_pkts)/1e6, (end_rx_pkts - start_rx_pkts)/1e6
+        ))
+
+        # print(("Sent {} pkts in 1 sec ({} Mpps)."
+        #        " Total elapsed {} secs. Total sent {} pkts.")
+        #       .format(end_pkts - start_pkts, (end_pkts - start_pkts)/1e6,
+        #               end_time - start_time, end_pkts))
+        # print(("Recd {} pkts in 1 sec ({} Mpps)."
+        #        " Total elapsed {} secs. Total sent {} pkts.")
+        #       .format(end_rx_pkts - start_rx_pkts,
+        #               (end_rx_pkts - start_rx_pkts)/1e6,
+        #               end_time - start_time, end_pkts))
 
     # Get results from local and remote worker
     rx_tot_pkt, rx_thr, rx_time = ol_w0_1_tg.computeThroughputApp('rx')
@@ -284,7 +302,7 @@ def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
     print("Sent {:14,} size: {:4}-Byte done!	Got {:14,} took {:8.4f} sec, thr: {:.3f} Gbps, theoretical: {:.3f} Gbps, difference: {:6.3f} Gbps"
           .format(num_pkts, app_payload_size, rx_tot_pkt, rx_time, rx_thr, theoretical_app, theoretical_app-rx_thr))
     time.sleep(0.5)
-    return entry_dict
+    return entry_dict, entries
 
 
 # %%
@@ -307,18 +325,31 @@ ol_w0 = setup_local_machine()
 setup_local_machine_throughput_experiment(ol_w0)
 
 # Sent  6,960,000,000 size:  128-Byte done!       Got  6,960,000,000 took 118.3673 sec, thr: 60.211 Gbps, theoretical: 65.979 Gbps, difference:  5.768 Gbps
-# start = time.time()
-# ret = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
-# end = time.time()
-# print("No PR: {}".format(ret))
-# print("Thr measurement took {} seconds.".format(end - start))
-
 start = time.time()
-ret = measure_throughput_under_pr(
-    client, dut, 0, ol_w0, 128, int(2 * 60 * 58 * 1e6))
+summary, entries = measure_throughput(ol_w0, 128, int(30 * 58 * 1e6))
 end = time.time()
-print("With full PR blast: {}".format(ret))
+print("No PR: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
+
+df = pd.DataFrame(entries)
+df.to_csv("./data/no-pr-ts.csv", index=False)
+with open("./data/no-pr-summary.json", "w") as f:
+    json.dump(summary, f)
+
+delay = 30
+start = time.time()
+summary, entries = measure_throughput_under_pr(
+    client, dut, delay, ol_w0, 128, int(2 * 60 * 58 * 1e6))
+end = time.time()
+print("With full PR blast: {}".format(summary))
+print("Thr measurement took {} seconds.".format(end - start))
+
+df = pd.DataFrame(entries)
+df.to_csv(f"./data/pr-{delay}delay-ts.csv", index=False)
+with open(f"./data/pr-{delay}delay-summary.json", "w") as f:
+    json.dump(summary, f)
+
+# import ipdb; ipdb.set_trace()
 
 # %%
 client.close()
