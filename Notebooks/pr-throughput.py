@@ -26,11 +26,15 @@ BITSTREAM_1 = (
 BITSTREAM_2 = (
     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
-    "open_nic_shell.runs//child_0_impl_1/"
+    "open_nic_shell.runs/child_0_impl_1/"
     "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
     "rm_intf_inst_pkt_size_counter5_partial.bit")
 PR_SCRIPT_PATH = ("/home/ubuntu/Projects/StaRR-NIC/"
                   "anup-starrnic-shell/script/replace_pr_util.sh")
+PROBES_PATH = (
+    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+    "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
+    "open_nic_shell.runs/impl_1/open_nic_shell.ltx")
 BOARD_NAME = "au280"
 
 
@@ -48,8 +52,8 @@ ip_w0_0, ip_w0_1 = '10.0.0.47', '10.0.0.45'
 n3_data = {
     'ip_tx_0': '10.0.0.55',
     'ip_rx_1': '10.0.0.57',
-    'mac_rx_1': '00:0a:35:ed:19:13',
-    'mac_tx_0': '00:0a:35:8d:6f:b1',
+    'mac_rx_1': "00:0a:35:ec:b9:9e",  # "00:0a:35:6e:dc:b4",
+    'mac_tx_0': "00:0a:35:23:1d:87",  # "00:0a:35:72:7b:90",
     'sport': 64000,
     'dport': 64001,
 }
@@ -112,7 +116,7 @@ def check_workers(client, workers):
 def perform_pr_once(bitstream=BITSTREAM_1):
     process = subprocess.run(
         " ".join([PR_SCRIPT_PATH, bitstream,
-                  BOARD_NAME, get_ltx_path(bitstream)]),
+                  BOARD_NAME, PROBES_PATH]),
         shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     return process.stdout, process.stderr
 
@@ -140,8 +144,9 @@ def perform_pr_continuous(inter_pr_time):
 
 def start_pr(client, dut, inter_pr_time):
     STOP.set(False)
-    client.submit(perform_pr_continuous, inter_pr_time,
+    ret = client.submit(perform_pr_continuous, inter_pr_time,
                   workers=dut, pure=False)
+    return ret
 
 
 def stop_pr(inter_pr_time):
@@ -218,10 +223,10 @@ def setup_local_machine_throughput_experiment(ol_w0):
 
 def measure_throughput_under_pr(client, dut, inter_pr_time,
                                 ol_w0, payload_size, num_pkts):
-    start_pr(client, dut, inter_pr_time)
+    pr_future = start_pr(client, dut, inter_pr_time)
     ret = measure_throughput(ol_w0, payload_size, num_pkts)
     stop_pr(inter_pr_time)
-    return ret
+    return ret, pr_future
 
 
 def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
@@ -336,9 +341,12 @@ df.to_csv("./data/no-pr-ts.csv", index=False)
 with open("./data/no-pr-summary.json", "w") as f:
     json.dump(summary, f)
 
+print("Sleeping for 10 seconds")
+time.sleep(10)
+
 delay = 30
 start = time.time()
-summary, entries = measure_throughput_under_pr(
+(summary, entries), pr_future = measure_throughput_under_pr(
     client, dut, delay, ol_w0, 128, int(2 * 60 * 58 * 1e6))
 end = time.time()
 print("With full PR blast: {}".format(summary))
@@ -349,7 +357,7 @@ df.to_csv(f"./data/pr-{delay}delay-ts.csv", index=False)
 with open(f"./data/pr-{delay}delay-summary.json", "w") as f:
     json.dump(summary, f)
 
-# import ipdb; ipdb.set_trace()
+import ipdb; ipdb.set_trace()
 
 # %%
 client.close()
