@@ -353,8 +353,8 @@ print("With full PR blast: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv(f"./data/pr-{delay}delay-ts.csv", index=False)
-with open(f"./data/pr-{delay}delay-summary.json", "w") as f:
+df.to_csv(f"./data/switch-only-pr-{delay}delay-ts.csv", index=False)
+with open(f"./data/switch-only-pr-{delay}delay-summary.json", "w") as f:
     json.dump(summary, f)
 
 import ipdb; ipdb.set_trace()
