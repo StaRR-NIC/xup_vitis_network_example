@@ -1,1 +1,1 @@
-{"size": 128, "rx_pkts": 1249989458, "tx_thr": 60.211204415488325, "rx_thr": 43.254806538086775, "theoretical_app": 65.97938144329896, "frame_size": 174, "theoretical_frame": 89.69072164948454, "frame_rx_thr": 58.79950263771171}
+{"size": 128, "rx_pkts": 1249989278, "tx_thr": 60.211204415488325, "rx_thr": 43.254800516320635, "theoretical_app": 65.97938144329896, "frame_size": 174, "theoretical_frame": 89.69072164948454, "frame_rx_thr": 58.799494451873365}
