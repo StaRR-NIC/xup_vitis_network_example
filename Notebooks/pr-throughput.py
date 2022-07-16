@@ -17,6 +17,10 @@ from vnx_utils import *
 
 # REMOTE
 REMOTE_NAME = "neptune3"
+PR_SCRIPT_PATH = ("/home/ubuntu/Projects/StaRR-NIC/"
+                  "anup-starrnic-shell/script/replace_pr_util.sh")
+
+# AXIS ARB MUX
 BITSTREAM_1 = (
     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
@@ -29,12 +33,27 @@ BITSTREAM_2 = (
     "open_nic_shell.runs/child_0_impl_1/"
     "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
     "rm_intf_inst_pkt_size_counter5_partial.bit")
-PR_SCRIPT_PATH = ("/home/ubuntu/Projects/StaRR-NIC/"
-                  "anup-starrnic-shell/script/replace_pr_util.sh")
 PROBES_PATH = (
     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
     "open_nic_shell.runs/impl_1/open_nic_shell.ltx")
+
+# AXIS SWITCH
+BITSTREAM_1 = (
+    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
+    "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
+    "_pkt_size_counter_partial.bit"
+)
+BITSTREAM_2 = (
+    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
+    "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
+    "_pkt_size_counter5_partial.bit"
+)
+PROBES_PATH = (
+    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg"
+    "open_nic_shell_counter.ltx"
+)
+
 BOARD_NAME = "au280"
 
 
@@ -332,17 +351,18 @@ setup_local_machine_throughput_experiment(ol_w0)
 # Sent  6,960,000,000 size:  128-Byte done!       Got  6,960,000,000 took 118.3673 sec, thr: 60.211 Gbps, theoretical: 65.979 Gbps, difference:  5.768 Gbps
 start = time.time()
 summary, entries = measure_throughput(ol_w0, 128, int(30 * 58 * 1e6))
+# summary, entries = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
 end = time.time()
 print("No PR: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv("./data/no-pr-ts.csv", index=False)
-with open("./data/no-pr-summary.json", "w") as f:
+df.to_csv("./data/axis_switch_combiner-no-pr-ts.csv", index=False)
+with open("./data/axis_switch_combiner-no-pr-summary.json", "w") as f:
     json.dump(summary, f)
 
-print("Sleeping for 10 seconds")
-time.sleep(10)
+# print("Sleeping for 10 seconds")
+# time.sleep(10)
 
 delay = 30
 start = time.time()
@@ -353,11 +373,11 @@ print("With full PR blast: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv(f"./data/switch-only-pr-{delay}delay-ts.csv", index=False)
-with open(f"./data/switch-only-pr-{delay}delay-summary.json", "w") as f:
+df.to_csv(f"./data/axis_switch_combiner-noop_pr-{delay}delay-ts.csv", index=False)
+with open(f"./data/axis_switch_combiner-noop_pr-{delay}delay-summary.json", "w") as f:
     json.dump(summary, f)
 
-import ipdb; ipdb.set_trace()
+# import ipdb; ipdb.set_trace()
 
 # %%
 client.close()
