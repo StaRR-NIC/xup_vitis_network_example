@@ -20,39 +20,54 @@ REMOTE_NAME = "neptune3"
 PR_SCRIPT_PATH = ("/home/ubuntu/Projects/StaRR-NIC/"
                   "anup-starrnic-shell/script/replace_pr_util.sh")
 
-# AXIS ARB MUX
-BITSTREAM_1 = (
-    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
-    "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
-    "open_nic_shell.runs/impl_1/"
-    "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
-    "rm_intf_inst_pkt_size_counter_partial.bit")
-BITSTREAM_2 = (
-    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
-    "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
-    "open_nic_shell.runs/child_0_impl_1/"
-    "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
-    "rm_intf_inst_pkt_size_counter5_partial.bit")
-PROBES_PATH = (
-    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
-    "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
-    "open_nic_shell.runs/impl_1/open_nic_shell.ltx")
+# # AXIS SWITCH
+# BITSTREAM_1 = (
+#     "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
+#     "_pkt_size_counter_partial.bit"
+# )
+# BITSTREAM_2 = (
+#     "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
+#     "_pkt_size_counter5_partial.bit"
+# )
+# PROBES_PATH = (
+#     "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg"
+#     "open_nic_shell_counter.ltx"
+# )
 
-# AXIS SWITCH
+# # AXIS ARB MUX
+# BITSTREAM_1 = (
+#     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+#     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
+#     "open_nic_shell.runs/impl_1/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
+#     "rm_intf_inst_pkt_size_counter_partial.bit")
+# BITSTREAM_2 = (
+#     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+#     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
+#     "open_nic_shell.runs/child_0_impl_1/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1_"
+#     "rm_intf_inst_pkt_size_counter5_partial.bit")
+# PROBES_PATH = (
+#     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+#     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
+#     "open_nic_shell.runs/impl_1/open_nic_shell.ltx")
+
+# AXIS DEMUX
 BITSTREAM_1 = (
-    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
-    "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
-    "_pkt_size_counter_partial.bit"
-)
+    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+    "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+    "open_nic_shell.runs/child_0_impl_1/"
+    "box_250mhz_inst_stream_switch_dfx_inst_partition1"
+    "_rm_intf_inst_pkt_size_counter5_partial.bit")
 BITSTREAM_2 = (
-    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg/"
-    "box_250mhz_inst_stream_switch_dfx_inst_partition1_rm_intf_inst"
-    "_pkt_size_counter5_partial.bit"
-)
-PROBES_PATH = (
-    "/datadrive/StaRR-NIC/starrnic-data/bitfiles/dfx-shorted-p4-reg"
-    "open_nic_shell_counter.ltx"
-)
+    "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+    "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+    "open_nic_shell.runs/impl_1/"
+    "box_250mhz_inst_stream_switch_dfx_inst_partition1"
+    "_rm_intf_inst_pkt_size_counter_partial.bit")
+PROBES_PATH = ""
 
 BOARD_NAME = "au280"
 
@@ -164,7 +179,7 @@ def perform_pr_continuous(inter_pr_time):
 def start_pr(client, dut, inter_pr_time):
     STOP.set(False)
     ret = client.submit(perform_pr_continuous, inter_pr_time,
-                  workers=dut, pure=False)
+                        workers=dut, pure=False)
     return ret
 
 
@@ -344,6 +359,9 @@ dut = workers[0]
 # end = time.time()
 # print("PR operation took {} seconds.".format(end - start))
 
+# # import sys
+# # sys.exit(0)
+
 # %%
 ol_w0 = setup_local_machine()
 setup_local_machine_throughput_experiment(ol_w0)
@@ -357,8 +375,8 @@ print("No PR: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv("./data/axis_switch_combiner-no-pr-ts.csv", index=False)
-with open("./data/axis_switch_combiner-no-pr-summary.json", "w") as f:
+df.to_csv("./data/axis_demux-no-pr-ts.csv", index=False)
+with open("./data/axis_demux-no-pr-summary.json", "w") as f:
     json.dump(summary, f)
 
 # print("Sleeping for 10 seconds")
@@ -369,12 +387,12 @@ start = time.time()
 (summary, entries), pr_future = measure_throughput_under_pr(
     client, dut, delay, ol_w0, 128, int(2 * 60 * 58 * 1e6))
 end = time.time()
-print("With full PR blast: {}".format(summary))
+print("With PR every {} secs: {}".format(delay, summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv(f"./data/axis_switch_combiner-noop_pr-{delay}delay-ts.csv", index=False)
-with open(f"./data/axis_switch_combiner-noop_pr-{delay}delay-summary.json", "w") as f:
+df.to_csv(f"./data/axis_demux-pr-{delay}delay-ts.csv", index=False)
+with open(f"./data/axis_demux-pr-{delay}delay-summary.json", "w") as f:
     json.dump(summary, f)
 
 # import ipdb; ipdb.set_trace()
