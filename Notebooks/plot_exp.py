@@ -20,6 +20,7 @@ ax.plot(df_intervals["ctime"], df_intervals["tx_mpps"], label="TX")
 ax.plot(df_intervals["ctime"], df_intervals["rx_mpps"], label="RX")
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Mpps (Payload = 128B)")
+ax.set_ylim(bottom=0)
 ax.legend()
 fig.set_tight_layout(True)
 
