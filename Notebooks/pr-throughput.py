@@ -81,13 +81,11 @@ XCLBIN = xclbin = (
 
 # PACKET HEADERS
 ip_w0_0, ip_w0_1 = '10.0.0.47', '10.0.0.45'
-# # Change mac address here after recompiling Open NIC
-# # TODO: Make open nic use static mac address
 n3_data = {
     'ip_tx_0': '10.0.0.55',
     'ip_rx_1': '10.0.0.57',
-    'mac_rx_1': '00:0a:35:86:00:01',  # "00:0a:35:ec:b9:9e",
-    'mac_tx_0': '00:0a:35:86:00:00',  # "00:0a:35:23:1d:87",
+    'mac_rx_1': '00:0a:35:86:00:01',
+    'mac_tx_0': '00:0a:35:86:00:00',
     'sport': 64000,
     'dport': 64001,
 }
@@ -104,6 +102,14 @@ rx_src_mac = n3_data['mac_tx_0']
 # overhead is UDP (8), IP (20), Ethernet(14) and FCS (4), IFG (12), preamble (7), start frame delimiter (1)
 OVERHEAD_APP = 8 + 20 + 14 + 4 + 12 + 7 + 1
 OVERHEAD_FRAME = 12 + 7 + 1
+
+# Latency consts
+# HBM0 is 256 MB total.
+# Default design only connects HBM0 to collector kernel.
+# TODO: Recompile to be able to connect other HBM pseudo channels.
+send_packets = 2 ** 25  # equal to 128MB (2^25 4 byte words), as some space is also used for summary buffer.
+shape = (send_packets, 1)
+
 
 # CLUSTER
 cluster = SSHCluster(["localhost", REMOTE_NAME],
@@ -204,17 +210,14 @@ def setup_local_machine():
     print("Worker 0_0: {}\nWorker 0_1: {}".format(
         if_status_w0_0, if_status_w0_1))
 
-    return ol_w0
-
-
-def setup_local_machine_throughput_experiment(ol_w0):
-
-    # Setup TX (Port 0)
+    # Throughput: Setup TX (Port 0). Latency: Setup port 0 for both TX/RX.
+    # Ensure DUT configured to route packets accordingly.
     ol_w0.networklayer_0.resetDebugProbes()
-    ol_w0.networklayer_0.sockets[12] = (tx_dst_ip, tx_dst_port,
-                                        tx_src_port, True)
-    ol_w0.networklayer_0.sockets[1] = (rx_src_ip, rx_dst_port,
-                                       rx_src_port, True)
+    ol_w0.networklayer_0.sockets[2] = (tx_dst_ip, tx_dst_port,
+                                       tx_src_port, True)
+    # Used for debugging is port 0 mistakenly recvs packets
+    # ol_w0.networklayer_0.sockets[1] = (rx_src_ip, rx_dst_port,
+    #                                    rx_src_port, True)
     ol_w0.networklayer_0.populateSocketTable()
 
     ol_w0.networklayer_0.invalidateARPTable()
@@ -224,7 +227,7 @@ def setup_local_machine_throughput_experiment(ol_w0):
     ol_w0.networklayer_0.readARPTable()
     print(ol_w0.networklayer_0.getDebugProbes)
 
-    # Setup RX (Port 1)
+    # Throughput: Setup RX (Port 1). Latency: Don't care
     ol_w0.networklayer_1.resetDebugProbes()
     ol_w0.networklayer_1.sockets[1] = (rx_src_ip, rx_dst_port,
                                        rx_src_port, True)
@@ -237,6 +240,10 @@ def setup_local_machine_throughput_experiment(ol_w0):
     ol_w0.networklayer_1.readARPTable()
     print(ol_w0.networklayer_1.getDebugProbes)
 
+    return ol_w0
+
+
+def setup_local_machine_throughput_experiment(ol_w0):
     # Setup CONSUMER
     ol_w0_1_tg = ol_w0.traffic_generator_1_1
     ol_w0_1_tg.register_map.debug_reset = 1
@@ -247,12 +254,74 @@ def setup_local_machine_throughput_experiment(ol_w0):
     ol_w0_0_tg = ol_w0.traffic_generator_0_3
     ol_w0_0_tg.register_map.debug_reset = 1
     ol_w0_0_tg.register_map.mode = benchmark_mode.index('PRODUCER')
-    ol_w0_0_tg.register_map.dest_id = 12
+    ol_w0_0_tg.register_map.dest_id = 2
 
     freq = int(ol_w0.clock_dict['clock0']['frequency'])
     print("Frequency: {}".format(freq))
     ol_w0_1_tg.freq = freq
     ol_w0_0_tg.freq = freq
+
+
+def setup_local_machine_latency_experiment(ol_w0):
+    # Returns the allocated buffers
+    # Allocate these buffers only once
+
+    rtt_cycles = pynq.allocate(shape, dtype=np.uint32, target=ol_w0.HBM0)
+    pkt = pynq.allocate(1, dtype=np.uint32, target=ol_w0.HBM0)
+
+    # Setup LATENCY kernel
+    ol_w0_tg = ol_w0.traffic_generator_0_2
+    ol_w0_tg.register_map.debug_reset = 1
+    ol_w0.networklayer_0.register_map.debug_reset_counters = 1
+    ol_w0_tg.register_map.mode = benchmark_mode.index('LATENCY')
+    ol_w0_tg.register_map.number_packets = send_packets
+    ol_w0_tg.register_map.time_between_packets = 1024  # cyles
+    ol_w0_tg.register_map.number_beats = 2  # 128 byte paylaod
+    ol_w0_tg.register_map.dest_id = 2
+
+    return rtt_cycles, pkt
+
+
+def measure_latency(ol_w0, rtt_cycles, pkt):
+    collector_h = ol_w0.collector_0_2.start(rtt_cycles, pkt)
+
+    ol_w0_tg = ol_w0.traffic_generator_0_2
+    ol_w0_tg.register_map.CTRL.AP_START = 1
+
+    # TODO: Wait until all pkts recvd.
+
+    rtt_cycles.sync_from_device()
+    # rtt_cycles
+
+
+def analyze_latency(ol_w0, rtt_cycles, pkt):
+
+    freq = int(ol_w0.clock_dict['clock0']['frequency'])
+    rtt_usec = np.array(shape, dtype=np.float)
+    rtt_usec = rtt_cycles / freq  # convert to microseconds
+
+    from scipy import stats
+    mean, std_dev, mode = np.mean(rtt_usec), np.std(rtt_usec), stats.mode(rtt_usec)
+    print("Round trip time at application level using {:,} packets".format(len(rtt_usec)))
+    print("\tmean    = {:.3f} us\n\tstd_dev = {:.6f} us".format(mean,std_dev))
+    print("\tmode    = {:.3f} us, which appears {:,} times".format(mode[0][0][0],mode[1][0][0]))
+    print("\tmax     = {:.3f} us".format(np.max(rtt_usec)))
+    print("\tmin     = {:.3f} us".format(np.min(rtt_usec)))
+
+    return rtt_usec
+
+
+def plot_latency(rtt_usec):
+
+    import matplotlib.pyplot as plt
+    red_square = dict(markerfacecolor='r', marker='s')
+    fig, ax = plt.subplots()
+    ax.set_title('RTT Box and whisker plot')
+    ax.set_xlabel('Round Trip Time (microsecond)')
+    ax.set_yticklabels([''])
+    fig.set_size_inches(18, 2)
+    ax.boxplot(rtt_usec, vert=False, flierprops=red_square)
+    fig.savefig('latency.pdf')
 
 
 def measure_throughput_under_pr(client, dut, inter_pr_time,
