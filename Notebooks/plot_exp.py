@@ -2,6 +2,18 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import sys
 
+# TODO: Read from exp dir
+#  If files don't exist. Skip plotting them.
+
+
+def plot_latency_summary_list(summary_list, times, figname):
+    fig, ax = plt.subplots()
+    round_times = [round(x, 6) for x in times]
+    ax.bxp(summary_list, positions=round_times)
+    ax.set_ylabel("Latency (us)")
+    ax.set_xlabel("Time (s)")
+    fig.savefig(figname, pad_inches=0.01, bbox_inches="tight")
+
 assert len(sys.argv) == 2
 
 fpath = sys.argv[1]
