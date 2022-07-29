@@ -1,15 +1,20 @@
 # %%
+import pickle
 import json
 import os
 import platform
 import subprocess
 import time
+from turtle import position
 
+import matplotlib.cbook as cbook
+import matplotlib.pyplot as plt
 import pandas as pd
 import pynq
 from distributed.client import Client
 from distributed.deploy.ssh import SSHCluster
 from distributed.variable import Variable
+from scipy import stats
 
 from vnx_utils import *
 
@@ -275,50 +280,105 @@ def setup_local_machine_latency_experiment(ol_w0):
     ol_w0.networklayer_0.register_map.debug_reset_counters = 1
     ol_w0_tg.register_map.mode = benchmark_mode.index('LATENCY')
     ol_w0_tg.register_map.number_packets = send_packets_latency
-    ol_w0_tg.register_map.time_between_packets = 1024  # cyles
-    ol_w0_tg.register_map.number_beats = 2  # 128 byte paylaod
+    ol_w0_tg.register_map.time_between_packets = 50  # cyles
+    ol_w0_tg.register_map.number_beats = 1  # 64 byte payload
     ol_w0_tg.register_map.dest_id = 2
 
     return rtt_cycles, pkt_summary
 
 
-def measure_latency(ol_w0, rtt_cycles, pkt_summary):
+def latency_probe(ol_w0, rtt_cycles, pkt_summary):
+    start = time.time()
     # collector_h =
     ol_w0.collector_0_2.start(rtt_cycles, pkt_summary)
 
     ol_w0_tg = ol_w0.traffic_generator_0_2
     ol_w0_tg.register_map.CTRL.AP_START = 1
 
+    # last_print = 0
+    # start_pkts = int(ol_w0_tg.register_map.out_traffic_packets)
+    # start_rx_pkts = int(ol_w0_tg.register_map.in_traffic_packets)
+    # window_start_pkts = int(ol_w0_tg.register_map.out_traffic_packets)
+    # window_start_rx_pkts = int(ol_w0_tg.register_map.in_traffic_packets)
+
     while(int(ol_w0_tg.register_map.out_traffic_packets)
           != send_packets_latency):
-        time.sleep(1)
+        pass
+        # end = time.time()
+        # if(end - start > last_print + 1):  # print every second
+        #     last_print = end - start
+
+        #     end_pkts = int(ol_w0_tg.register_map.out_traffic_packets)
+        #     end_rx_pkts = int(ol_w0_tg.register_map.in_traffic_packets)
+
+        #     print(("{:.6f} secs, Total: TX {} pkts, RX {} pkts."
+        #            " Delta: TX {} MPkts, RX: {} Mpkts")
+        #           .format(
+        #               end - start,
+        #               end_pkts - start_pkts, end_rx_pkts - start_rx_pkts,
+        #               (end_pkts - window_start_pkts)/1e6,
+        #               (end_rx_pkts - window_start_rx_pkts)/1e6
+        #     ))
+
+        #     window_start_pkts = end_pkts
+        #     window_start_rx_pkts = end_rx_pkts
+
+    end = time.time()
+    # print(f"Latency measurement took {end - start} secs.")
 
     rtt_cycles.sync_from_device()
-    # pkt_summary.sync_from_device()
-    # rtt_cycles
-
-
-def analyze_latency(ol_w0, rtt_cycles, pkt_summary):
+    pkt_summary.sync_from_device()
+    ol_w0_tg.register_map.debug_reset = 1  # for next measurement
 
     freq = int(ol_w0.clock_dict['clock0']['frequency'])
-    rtt_usec = np.array(shape_rtt_cycles, dtype=np.float)
+    rtt_usec = np.array(shape_rtt_cycles, dtype=float)
     rtt_usec = rtt_cycles / freq  # convert to microseconds
-
-    from scipy import stats
-    mean, std_dev, mode = (np.mean(rtt_usec), np.std(
-        rtt_usec), stats.mode(rtt_usec))
-    print("Round trip time at application level using {:,} packets"
-          .format(len(rtt_usec)))
-    print("\tmean    = {:.3f} us\n\tstd_dev = {:.6f} us".format(mean, std_dev))
-    print("\tmode    = {:.3f} us, which appears {:,} times"
-          .format(mode[0][0][0], mode[1][0][0]))
-    print("\tmax     = {:.3f} us".format(np.max(rtt_usec)))
-    print("\tmin     = {:.3f} us".format(np.min(rtt_usec)))
-
     return rtt_usec
 
 
-def plot_latency(rtt_usec):
+def latency_probe_summary(rtt_usec, time_since_start):
+    mean, std_dev, mode = (np.mean(rtt_usec), np.std(
+        rtt_usec), stats.mode(rtt_usec))
+    print("{:6f}, mean {:6f} us, std dev {:6f} us, max {:6f} us, min {:6f} us.".format(
+        time_since_start, mean, std_dev, np.max(rtt_usec), np.min(rtt_usec)
+    ))
+    # This summary can be directly used with matplotlib boxplot
+    summary = cbook.boxplot_stats(rtt_usec)
+
+    # print("Round trip time at application level using {:,} packets"
+    #       .format(len(rtt_usec)))
+    # print("\tmean    = {:.3f} us\n\tstd_dev = {:.6f} us".format(mean, std_dev))
+    # print("\tmode    = {:.3f} us, which appears {:,} times"
+    #       .format(mode[0][0][0], mode[1][0][0]))
+    # print("\tmax     = {:.3f} us".format(np.max(rtt_usec)))
+    # print("\tmin     = {:.3f} us".format(np.min(rtt_usec)))
+    return summary
+
+
+def measure_latency(ol_w0, rtt_cycles, pkt_summary, measurement_time):
+    start = time.time()
+    end = time.time()
+    summary_list = []
+    times = []
+    print("Time, total sent pkts, total recd pkts, window sent pkts, window recd pkts")
+    while(end - start <= measurement_time):
+        rtt_usec = latency_probe(ol_w0, rtt_cycles, pkt_summary)
+        end = time.time()
+        summary = latency_probe_summary(rtt_usec, end - start)
+        summary_list.extend(summary)
+        times.append(end - start)
+    return summary_list, times
+
+
+def measure_latency_under_pr(client, dut, inter_pr_time,
+                             ol_w0, rtt_cycles, pkt_summary, measurement_time):
+    pr_future = start_pr(client, dut, inter_pr_time)
+    ret = measure_latency(ol_w0, rtt_cycles, pkt_summary, measurement_time)
+    stop_pr(inter_pr_time)
+    return ret, pr_future
+
+
+def plot_latency_probe(rtt_usec):
 
     import matplotlib.pyplot as plt
     red_square = dict(markerfacecolor='r', marker='s')
@@ -337,6 +397,15 @@ def measure_throughput_under_pr(client, dut, inter_pr_time,
     ret = measure_throughput(ol_w0, payload_size, num_pkts)
     stop_pr(inter_pr_time)
     return ret, pr_future
+
+
+def plot_latency_summary_list(summary_list, times, figname):
+    fig, ax = plt.subplots()
+    round_times = [round(x, 6) for x in times]
+    ax.bxp(summary_list, positions=round_times)
+    ax.set_ylabel("Latency (us)")
+    ax.set_xlabel("Time (s)")
+    fig.savefig(figname, pad_inches=0.01, bbox_inches="tight")
 
 
 def measure_throughput(ol_w0, payload_size, num_pkts=int(1e6)):
@@ -438,41 +507,63 @@ dut = workers[0]
 # # import sys
 # # sys.exit(0)
 
-# %%
 EXP_TAG = "axis_demux-redo"
 ol_w0 = setup_local_machine()
-setup_local_machine_throughput_experiment(ol_w0)
 
-# Sent  6,960,000,000 size:  128-Byte done!       Got  6,960,000,000 took 118.3673 sec, thr: 60.211 Gbps, theoretical: 65.979 Gbps, difference:  5.768 Gbps
-start = time.time()
-summary, entries = measure_throughput(ol_w0, 128, int(30 * 58 * 1e6))
-# summary, entries = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
-end = time.time()
-print("No PR: {}".format(summary))
-print("Thr measurement took {} seconds.".format(end - start))
+# %%
+LATENCY_MEASUREMENT_TIME = 15  # secs
+LATENCY_MEASUREMENT_TIME_UNDER_PR = 120  # secs
+INTER_PR_TIME = 30  # secs
+rtt_cycles, pkt_summary = setup_local_machine_latency_experiment(ol_w0)
 
-df = pd.DataFrame(entries)
-df.to_csv(f"./data/{EXP_TAG}-no-pr-ts.csv", index=False)
-with open(f"./data/{EXP_TAG}-no-pr-summary.json", "w") as f:
-    json.dump(summary, f)
+summary_list, times = measure_latency(ol_w0, rtt_cycles, pkt_summary,
+                                      LATENCY_MEASUREMENT_TIME)
+figname = f"./data/{EXP_TAG}-no-pr-latency.png"
+plot_latency_summary_list(summary_list, times, figname)
 
-# print("Sleeping for 10 seconds")
-# time.sleep(10)
+(summary_list_pr, times_pr), pr_future = measure_latency_under_pr(
+    client, dut, INTER_PR_TIME, ol_w0, rtt_cycles, pkt_summary,
+    LATENCY_MEASUREMENT_TIME_UNDER_PR)
+figname = f"./data/{EXP_TAG}-pr-{INTER_PR_TIME}delay-latency.png"
+plot_latency_summary_list(summary_list_pr, times_pr, figname)
 
-delay = 30
-start = time.time()
-(summary, entries), pr_future = measure_throughput_under_pr(
-    client, dut, delay, ol_w0, 128, int(2 * 60 * 58 * 1e6))
-end = time.time()
-print("With PR every {} secs: {}".format(delay, summary))
-print("Thr measurement took {} seconds.".format(end - start))
+# plot_latency(rtt_usec)
 
-df = pd.DataFrame(entries)
-df.to_csv(f"./data/{EXP_TAG}-pr-{delay}delay-ts.csv", index=False)
-with open(f"./data/{EXP_TAG}-pr-{delay}delay-summary.json", "w") as f:
-    json.dump(summary, f)
+import ipdb; ipdb.set_trace()
 
-# import ipdb; ipdb.set_trace()
+# # %%
+# setup_local_machine_throughput_experiment(ol_w0)
+
+# # Sent  6,960,000,000 size:  128-Byte done!       Got  6,960,000,000 took 118.3673 sec, thr: 60.211 Gbps, theoretical: 65.979 Gbps, difference:  5.768 Gbps
+# start = time.time()
+# summary, entries = measure_throughput(ol_w0, 128, int(30 * 58 * 1e6))
+# # summary, entries = measure_throughput(ol_w0, 128, int(2 * 60 * 58 * 1e6))
+# end = time.time()
+# print("No PR: {}".format(summary))
+# print("Thr measurement took {} seconds.".format(end - start))
+
+# df = pd.DataFrame(entries)
+# df.to_csv(f"./data/{EXP_TAG}-no-pr-ts.csv", index=False)
+# with open(f"./data/{EXP_TAG}-no-pr-summary.json", "w") as f:
+#     json.dump(summary, f)
+
+# # print("Sleeping for 10 seconds")
+# # time.sleep(10)
+
+# delay = 30
+# start = time.time()
+# (summary, entries), pr_future = measure_throughput_under_pr(
+#     client, dut, delay, ol_w0, 128, int(2 * 60 * 58 * 1e6))
+# end = time.time()
+# print("With PR every {} secs: {}".format(delay, summary))
+# print("Thr measurement took {} seconds.".format(end - start))
+
+# df = pd.DataFrame(entries)
+# df.to_csv(f"./data/{EXP_TAG}-pr-{delay}delay-ts.csv", index=False)
+# with open(f"./data/{EXP_TAG}-pr-{delay}delay-summary.json", "w") as f:
+#     json.dump(summary, f)
+
+# # import ipdb; ipdb.set_trace()
 
 # %%
 client.close()
