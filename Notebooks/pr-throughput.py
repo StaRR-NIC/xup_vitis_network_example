@@ -107,8 +107,8 @@ OVERHEAD_FRAME = 12 + 7 + 1
 # HBM0 is 256 MB total.
 # Default design only connects HBM0 to collector kernel.
 # TODO: Recompile to be able to connect other HBM pseudo channels.
-send_packets = 2 ** 25  # equal to 128MB (2^25 4 byte words), as some space is also used for summary buffer.
-shape = (send_packets, 1)
+send_packets_latency = 2 ** 25  # equal to 128MB (2^25 4 byte words), as some space is also used for summary buffer.
+shape_rtt_cycles = (send_packets_latency, 1)
 
 
 # CLUSTER
@@ -266,45 +266,52 @@ def setup_local_machine_latency_experiment(ol_w0):
     # Returns the allocated buffers
     # Allocate these buffers only once
 
-    rtt_cycles = pynq.allocate(shape, dtype=np.uint32, target=ol_w0.HBM0)
-    pkt = pynq.allocate(1, dtype=np.uint32, target=ol_w0.HBM0)
+    rtt_cycles = pynq.allocate(shape_rtt_cycles, dtype=np.uint32, target=ol_w0.HBM0)
+    pkt_summary = pynq.allocate(1, dtype=np.uint32, target=ol_w0.HBM0)
 
     # Setup LATENCY kernel
     ol_w0_tg = ol_w0.traffic_generator_0_2
     ol_w0_tg.register_map.debug_reset = 1
     ol_w0.networklayer_0.register_map.debug_reset_counters = 1
     ol_w0_tg.register_map.mode = benchmark_mode.index('LATENCY')
-    ol_w0_tg.register_map.number_packets = send_packets
+    ol_w0_tg.register_map.number_packets = send_packets_latency
     ol_w0_tg.register_map.time_between_packets = 1024  # cyles
     ol_w0_tg.register_map.number_beats = 2  # 128 byte paylaod
     ol_w0_tg.register_map.dest_id = 2
 
-    return rtt_cycles, pkt
+    return rtt_cycles, pkt_summary
 
 
-def measure_latency(ol_w0, rtt_cycles, pkt):
-    collector_h = ol_w0.collector_0_2.start(rtt_cycles, pkt)
+def measure_latency(ol_w0, rtt_cycles, pkt_summary):
+    # collector_h =
+    ol_w0.collector_0_2.start(rtt_cycles, pkt_summary)
 
     ol_w0_tg = ol_w0.traffic_generator_0_2
     ol_w0_tg.register_map.CTRL.AP_START = 1
 
-    # TODO: Wait until all pkts recvd.
+    while(int(ol_w0_tg.register_map.out_traffic_packets)
+          != send_packets_latency):
+        time.sleep(1)
 
     rtt_cycles.sync_from_device()
+    # pkt_summary.sync_from_device()
     # rtt_cycles
 
 
-def analyze_latency(ol_w0, rtt_cycles, pkt):
+def analyze_latency(ol_w0, rtt_cycles, pkt_summary):
 
     freq = int(ol_w0.clock_dict['clock0']['frequency'])
-    rtt_usec = np.array(shape, dtype=np.float)
+    rtt_usec = np.array(shape_rtt_cycles, dtype=np.float)
     rtt_usec = rtt_cycles / freq  # convert to microseconds
 
     from scipy import stats
-    mean, std_dev, mode = np.mean(rtt_usec), np.std(rtt_usec), stats.mode(rtt_usec)
-    print("Round trip time at application level using {:,} packets".format(len(rtt_usec)))
-    print("\tmean    = {:.3f} us\n\tstd_dev = {:.6f} us".format(mean,std_dev))
-    print("\tmode    = {:.3f} us, which appears {:,} times".format(mode[0][0][0],mode[1][0][0]))
+    mean, std_dev, mode = (np.mean(rtt_usec), np.std(
+        rtt_usec), stats.mode(rtt_usec))
+    print("Round trip time at application level using {:,} packets"
+          .format(len(rtt_usec)))
+    print("\tmean    = {:.3f} us\n\tstd_dev = {:.6f} us".format(mean, std_dev))
+    print("\tmode    = {:.3f} us, which appears {:,} times"
+          .format(mode[0][0][0], mode[1][0][0]))
     print("\tmax     = {:.3f} us".format(np.max(rtt_usec)))
     print("\tmin     = {:.3f} us".format(np.min(rtt_usec)))
 
@@ -432,6 +439,7 @@ dut = workers[0]
 # # sys.exit(0)
 
 # %%
+EXP_TAG = "axis_demux-redo"
 ol_w0 = setup_local_machine()
 setup_local_machine_throughput_experiment(ol_w0)
 
@@ -444,8 +452,8 @@ print("No PR: {}".format(summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv("./data/axis_demux-no-pr-ts.csv", index=False)
-with open("./data/axis_demux-no-pr-summary.json", "w") as f:
+df.to_csv(f"./data/{EXP_TAG}-no-pr-ts.csv", index=False)
+with open(f"./data/{EXP_TAG}-no-pr-summary.json", "w") as f:
     json.dump(summary, f)
 
 # print("Sleeping for 10 seconds")
@@ -460,8 +468,8 @@ print("With PR every {} secs: {}".format(delay, summary))
 print("Thr measurement took {} seconds.".format(end - start))
 
 df = pd.DataFrame(entries)
-df.to_csv(f"./data/axis_demux-pr-{delay}delay-ts.csv", index=False)
-with open(f"./data/axis_demux-pr-{delay}delay-summary.json", "w") as f:
+df.to_csv(f"./data/{EXP_TAG}-pr-{delay}delay-ts.csv", index=False)
+with open(f"./data/{EXP_TAG}-pr-{delay}delay-summary.json", "w") as f:
     json.dump(summary, f)
 
 # import ipdb; ipdb.set_trace()
