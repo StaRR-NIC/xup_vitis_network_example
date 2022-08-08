@@ -46,10 +46,10 @@ def plot_latency_box(inpath, outpath):
     fig, ax = plt.subplots()
     round_times = [round(x, 1) for x in times]
     ax.bxp(summary_list, positions=round_times, showmeans=True, showfliers=False)
-    round_min = round(min(times), 0)
-    round_max = round(max(times), 0)
+    round_min = round(min(times), 1)
+    round_max = round(max(times), 1)
     steps = (round_max - round_min) / 8
-    ax.set_xticks(np.arange(round_min, round_max, steps).round(0), np.arange(round_min, round_max, steps).round(0))
+    ax.set_xticks(np.arange(round_min, round_max, steps).round(1), np.arange(round_min, round_max, steps).round(1))
     ax.set_ylabel("Latency (us)")
     ax.set_xlabel("Time (s)")
     fig.savefig(outpath, pad_inches=0.01, bbox_inches="tight")
