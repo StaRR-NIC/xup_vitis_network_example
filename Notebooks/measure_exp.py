@@ -61,16 +61,31 @@ SETUP_REGISTER_SCRIPT_PATH = ("/home/ubuntu/Projects/StaRR-NIC/"
 #     "build/au280_shorted-p4-bypass-ila/open_nic_shell/"
 #     "open_nic_shell.runs/impl_1/open_nic_shell.ltx")
 
-# AXIS DEMUX
+# # AXIS DEMUX
+# BITSTREAM_1 = (
+#     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+#     "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+#     "open_nic_shell.runs/child_0_impl_1/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1"
+#     "_rm_intf_inst_pkt_size_counter5_partial.bit")
+# BITSTREAM_2 = (
+#     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
+#     "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+#     "open_nic_shell.runs/impl_1/"
+#     "box_250mhz_inst_stream_switch_dfx_inst_partition1"
+#     "_rm_intf_inst_pkt_size_counter_partial.bit")
+# PROBES_PATH = ""
+
+# DISABLE_RM
 BITSTREAM_1 = (
     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
-    "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+    "build/au280_shorted-p4-bypass-disable_rm/open_nic_shell/"
     "open_nic_shell.runs/child_0_impl_1/"
     "box_250mhz_inst_stream_switch_dfx_inst_partition1"
     "_rm_intf_inst_pkt_size_counter5_partial.bit")
 BITSTREAM_2 = (
     "/home/ubuntu/Projects/StaRR-NIC/anup-starrnic-shell/"
-    "build/au280_shorted-p4-bypass-demux/open_nic_shell/"
+    "build/au280_shorted-p4-bypass-disable_rm/open_nic_shell/"
     "open_nic_shell.runs/impl_1/"
     "box_250mhz_inst_stream_switch_dfx_inst_partition1"
     "_rm_intf_inst_pkt_size_counter_partial.bit")
@@ -523,7 +538,7 @@ dut = workers[0]
 # print(err)
 
 # %%
-EXP_TAG = "axis_demux"
+EXP_TAG = "disable_rm"
 EXP_DIR = f"./data/{EXP_TAG}"
 os.makedirs(EXP_DIR, exist_ok=True)
 
