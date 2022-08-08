@@ -566,29 +566,6 @@ with open(os.path.join(EXP_DIR, "config.json"), 'w') as f:
 ol_w0 = setup_local_machine()
 
 # %%
-# Latency measurement
-print("Latency measurement started")
-
-rtt_cycles, pkt_summary = setup_local_machine_latency_experiment(ol_w0)
-setup_remote_machine_latency_experiment(client, dut)
-
-summary_list, times = measure_latency(ol_w0, rtt_cycles, pkt_summary,
-                                      LATENCY_MEASUREMENT_TIME)
-fname = "without_pr-latency.pickle"
-with open(os.path.join(EXP_DIR, fname), 'wb') as f:
-    pickle.dump((summary_list, times), f)
-
-(summary_list_pr, times_pr), pr_future = measure_latency_under_pr(
-    client, dut, INTER_PR_TIME, ol_w0, rtt_cycles, pkt_summary,
-    LATENCY_MEASUREMENT_TIME_UNDER_PR)
-
-fname = "with_pr-latency.pickle"
-with open(os.path.join(EXP_DIR, fname), 'wb') as f:
-    pickle.dump((summary_list_pr, times_pr), f)
-
-print("Latency measurement complete")
-
-# %%
 # Throughput measurement
 print("Throughput measurement started")
 
@@ -621,6 +598,29 @@ with open(os.path.join(EXP_DIR, f"with_pr-summary.json"), "w") as f:
     json.dump(summary, f)
 
 print("Throughput measurement complete")
+
+# %%
+# Latency measurement
+print("Latency measurement started")
+
+rtt_cycles, pkt_summary = setup_local_machine_latency_experiment(ol_w0)
+setup_remote_machine_latency_experiment(client, dut)
+
+summary_list, times = measure_latency(ol_w0, rtt_cycles, pkt_summary,
+                                      LATENCY_MEASUREMENT_TIME)
+fname = "without_pr-latency.pickle"
+with open(os.path.join(EXP_DIR, fname), 'wb') as f:
+    pickle.dump((summary_list, times), f)
+
+(summary_list_pr, times_pr), pr_future = measure_latency_under_pr(
+    client, dut, INTER_PR_TIME, ol_w0, rtt_cycles, pkt_summary,
+    LATENCY_MEASUREMENT_TIME_UNDER_PR)
+
+fname = "with_pr-latency.pickle"
+with open(os.path.join(EXP_DIR, fname), 'wb') as f:
+    pickle.dump((summary_list_pr, times_pr), f)
+
+print("Latency measurement complete")
 
 # %%
 client.close()
