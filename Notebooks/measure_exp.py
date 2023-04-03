@@ -538,15 +538,15 @@ dut = workers[0]
 # print(err)
 
 # %%
-EXP_TAG = "disable_rm"
+EXP_TAG = "disable_rm-redo"
 EXP_DIR = f"./data/{EXP_TAG}"
 os.makedirs(EXP_DIR, exist_ok=True)
 
 # Exp config
-INTER_PR_TIME = 10  # secs
+INTER_PR_TIME = 5  # secs
 
 LATENCY_MEASUREMENT_TIME = 15  # secs
-LATENCY_MEASUREMENT_TIME_UNDER_PR = 120  # secs
+LATENCY_MEASUREMENT_TIME_UNDER_PR = 5 * 120  # secs (10 mins)
 
 THROUGHPUT_PAYLOAD_SIZE = 64  # bytes
 THROUGHPUT_PROBE_PKTS = int(30 * 58 * 1e6)

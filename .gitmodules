@@ -3,3 +3,6 @@
 	url = https://github.com/hpcn-uam/100G-fpga-network-stack-core.git
 	shallow = true
 	branch = vnx-vitis-hls
+[submodule "ext/plot_config"]
+	path = ext/plot_config
+	url = git@github.com:108anup/plot_config.git
